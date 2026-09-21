@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "WeatherFunctions": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7157"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker",
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
+      "containerRunArguments": "--init",
+      "httpPort": 33488,
+      "useSSL": false
+    }
+  }
+}
