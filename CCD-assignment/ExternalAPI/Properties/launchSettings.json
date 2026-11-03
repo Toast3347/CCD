@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "ExternalAPI": {
+      "commandName": "Project"
+    }
+  }
+}
