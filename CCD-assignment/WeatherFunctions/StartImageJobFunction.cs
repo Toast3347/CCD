@@ -1,52 +1,96 @@
-using Azure.Storage.Queues;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using System.Net;
-using System.Text.Json;
 using WeatherFunctions.DTOs;
+using WeatherFunctions.Services;
 
 namespace WeatherFunctions;
 
 public class StartImageJobFunction
 {
-    private readonly QueueClient _queueClient;
+    private readonly QueueStorageService _queueService;
 
-    public StartImageJobFunction(QueueClient queueClient)
+    private readonly JobStatusService _jobStatusService;
+
+    private readonly ILogger<StartImageJobFunction> _logger;
+
+    public StartImageJobFunction(
+    QueueStorageService queueService,
+    JobStatusService jobStatusService,
+    ILogger<StartImageJobFunction> logger)
     {
-        _queueClient = queueClient;
+        _queueService = queueService;
+        _jobStatusService = jobStatusService;
+        _logger = logger;
     }
 
     [Function("StartImageJob")]
-    public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous,"post",Route = "images")]HttpRequestData request)
+    public async Task<HttpResponseData> Run(
+    [HttpTrigger(
+        AuthorizationLevel.Anonymous,
+        "post",
+        Route = "images")]
+    HttpRequestData request,
+    CancellationToken cancellationToken)
     {
         var jobId = Guid.NewGuid();
 
-        var message = new WeatherJobMessageDto
+        try
         {
-            JobId = jobId
-        };
+            await _jobStatusService.InitializeAsync(cancellationToken);
 
-        await _queueClient.CreateIfNotExistsAsync();
+            await _jobStatusService.CreateJobAsync(
+                jobId,
+                cancellationToken);
 
-        var serializedMessage = JsonSerializer.Serialize(message);
+            var message = new WeatherJobMessageDto
+            {
+                JobId = jobId
+            };
 
-        await _queueClient.SendMessageAsync(serializedMessage);
+            await _queueService.InitializeAsync(cancellationToken);
 
-        var baseUrl = request.Url.GetLeftPart(UriPartial.Authority);
+            await _queueService.SendWeatherJobAsync(
+                message,
+                cancellationToken);
 
-        var response = request.CreateResponse(HttpStatusCode.Accepted);
+            var baseUrl = request.Url.GetLeftPart(
+                UriPartial.Authority);
 
-        await response.WriteAsJsonAsync(new
+            var response = request.CreateResponse(
+                HttpStatusCode.Accepted);
+
+            await response.WriteAsJsonAsync(new
+            {
+                JobId = jobId,
+                Status = "Queued",
+                CreatedAt = DateTimeOffset.UtcNow,
+                Message = "Your image generation job has been accepted.",
+                StatusUrl = $"{baseUrl}/api/images/{jobId}/status",
+                ResultsUrl = $"{baseUrl}/api/images/{jobId}"
+            });
+
+            return response;
+        }
+        catch (Exception ex)
         {
-            JobId = jobId,
-            Status = "Queued",
-            StatusUrl = $"{baseUrl}/api/images/{jobId}/status",
-            ResultsUrl = $"{baseUrl}/api/images/{jobId}"
-        });
+            _logger.LogError(
+                ex,
+                "Failed to start image generation job {JobId}",
+                jobId);
 
-        return response;
+            var response = request.CreateResponse(
+                HttpStatusCode.InternalServerError);
+
+            await response.WriteAsJsonAsync(new
+            {
+                JobId = jobId,
+                Status = "Failed",
+                Message = "Could not start the image generation job."
+            });
+
+            return response;
+        }
     }
 }
