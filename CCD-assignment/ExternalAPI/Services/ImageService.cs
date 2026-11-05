@@ -48,9 +48,12 @@ public sealed class ImageService : IImageService
 
         using var image = Image.Load(originalImageBytes);
 
+        // System.I0.Path because 'Path' is an ambiguous reference between 'SixLabors.ImageSharp.Drawing.Path' and 'System.IO.Path'. Ugly but necessary to avoid ambiguity.
+        string fontPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "../../../Fonts/Arial.ttf"));
+
         FontCollection collection = new();
 
-        FontFamily family = collection.Add("./Fonts/Arial.ttf");
+        FontFamily family = collection.Add(fontPath);
 
         Font font = family.CreateFont(
             24,
