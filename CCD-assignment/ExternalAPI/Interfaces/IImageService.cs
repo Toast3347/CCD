@@ -1,10 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using ExternalAPI.Models;
 
 namespace ExternalAPI.Interfaces
 {
-    internal interface IImageService
+    public interface IImageService
     {
+        Task<ImageProcessingResult> GetAndProcessImageAsync(WeatherStation station, Guid jobId);
     }
 }
