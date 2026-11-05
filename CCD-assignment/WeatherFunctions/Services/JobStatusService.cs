@@ -1,5 +1,6 @@
 ﻿using Azure;
 using Azure.Data.Tables;
+using System.Text.Json;
 
 namespace WeatherFunctions.Services;
 
@@ -7,11 +8,9 @@ public sealed class JobStatusService
 {
     private readonly TableClient _tableClient;
 
-    public JobStatusService(string connectionString)
+    public JobStatusService(TableClient tableClient)
     {
-        _tableClient = new TableClient(
-            connectionString,
-            "ImageJobs");
+        _tableClient = tableClient;
     }
 
     public async Task InitializeAsync(
@@ -32,9 +31,10 @@ public sealed class JobStatusService
             ["Status"] = "Queued",
             ["CreatedAt"] = DateTimeOffset.UtcNow,
             ["UpdatedAt"] = DateTimeOffset.UtcNow,
-            ["TotalStations"] = 0,
+            ["TotalStations"] = 50,
             ["ProcessedImages"] = 0,
-            ["FailedImages"] = 0
+            ["FailedImages"] = 0,
+            ["ResultUrls"] = "[]" 
         };
 
         await _tableClient.AddEntityAsync(
@@ -53,6 +53,41 @@ public sealed class JobStatusService
                 cancellationToken: cancellationToken);
 
         return response.HasValue ? response.Value : null;
+    }
+
+    public async Task UpdateProgressAsync(
+        Guid jobId,
+        int processedCount,
+        int failedCount,
+        List<string> urls,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await GetJobAsync(jobId, cancellationToken);
+
+        if (entity is null)
+        {
+            throw new InvalidOperationException(
+                $"Job {jobId} was not found.");
+        }
+
+        entity["ProcessedImages"] = processedCount;
+        entity["FailedImages"] = failedCount;
+        entity["ResultUrls"] = JsonSerializer.Serialize(urls);
+        entity["UpdatedAt"] = DateTimeOffset.UtcNow;
+
+        if (processedCount == 50)
+        {
+            entity["Status"] = "Completed";
+        }
+        else if (failedCount > 0)
+        {
+            entity["Status"] = "PartiallyFailed";
+        }
+
+        await _tableClient.UpsertEntityAsync(
+            entity,
+            TableUpdateMode.Merge,
+            cancellationToken);
     }
 
     public async Task UpdateStatusAsync(
