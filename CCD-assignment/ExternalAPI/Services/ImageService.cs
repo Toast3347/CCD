@@ -31,9 +31,6 @@ public sealed class ImageService : IImageService
         var response = await _httpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
-        // Small delay for rate limiting
-        await Task.Delay(1000);
-
         var jsonString = await response.Content.ReadAsStringAsync();
         using var jsonDoc = JsonDocument.Parse(jsonString);
         string imageUrl = jsonDoc.RootElement.GetProperty("urls").GetProperty("regular").GetString();

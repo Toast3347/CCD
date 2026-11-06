@@ -31,7 +31,7 @@ public sealed class JobStatusService
             ["Status"] = "Queued",
             ["CreatedAt"] = DateTimeOffset.UtcNow,
             ["UpdatedAt"] = DateTimeOffset.UtcNow,
-            ["TotalStations"] = 2, //testing purpose, should be 50. 2 to avoid rate limiting issues with Unsplash API of max 50 requests per hour.
+            ["TotalStations"] = 50,
             ["ProcessedImages"] = 0,
             ["FailedImages"] = 0,
             ["ResultUrls"] = "[]" 

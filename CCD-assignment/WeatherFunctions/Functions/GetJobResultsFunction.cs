@@ -23,18 +23,35 @@ public class GetJobResultsFunction
 
     [Function("GetJobResults")]
     public async Task<HttpResponseData> Run(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "images/{jobId}")] HttpRequestData req,
-    string jobId)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "images/{jobId}")] HttpRequestData req,
+        string jobId)
     {
-        var record = await _tableClient.GetEntityAsync<JobStatusRecord>(jobId, jobId);
+        if (!Guid.TryParse(jobId, out var parsedJobId))
+        {
+            var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
+            await badRequest.WriteAsJsonAsync(new { Message = "Invalid job ID." });
+            return badRequest;
+        }
+
+        var record = await _tableClient.GetEntityAsync<JobStatusRecord>("ImageJobs", jobId);
+
+        if (record is null)
+        {
+            var notFound = req.CreateResponse(HttpStatusCode.NotFound);
+            await notFound.WriteAsJsonAsync(new { Message = $"Job {jobId} was not found." });
+            return notFound;
+        }
 
         var response = req.CreateResponse(HttpStatusCode.OK);
+
+        var urls = JsonSerializer.Deserialize<List<string>>(record.Value.ResultUrls) ?? new List<string>();
+
         await response.WriteAsJsonAsync(new
         {
             Status = record.Value.Status,
-            Images = JsonSerializer.Deserialize<List<string>>(record.Value.ResultUrls)
+            Images = urls
         });
+
         return response;
     }
-
 }
