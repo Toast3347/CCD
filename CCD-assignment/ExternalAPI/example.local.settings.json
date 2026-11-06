@@ -1,0 +1,6 @@
+{
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "UnsplashApiKey": "your-unsplash-api-key"
+  }
+}

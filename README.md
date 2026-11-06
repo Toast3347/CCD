@@ -3,6 +3,7 @@ CCD-assignment for Inholland + Hypersolid
 
 ## Prerequisites
 Docker
+Unsplash dev account and key
 
 ## Local setup
 
@@ -32,6 +33,12 @@ func start
 Make a request.
 ```bash
 Default request url:  http://localhost:7071/api/images
+```
+
+## Azure deployment
+run deploy script from infrastrucutre folder:
+```bash
+./deploy.ps1
 ```
 
 ## Endpoints

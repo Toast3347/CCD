@@ -2,11 +2,7 @@
 using Azure.Storage.Sas;
 using ExternalAPI.Interfaces;
 using ExternalAPI.Models;
-using SixLabors.Fonts;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Drawing;
-using SixLabors.ImageSharp.Drawing.Processing;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 using System.Text.Json;
 
 namespace ExternalAPI.Services;
@@ -17,77 +13,120 @@ public sealed class ImageService : IImageService
     private readonly BlobServiceClient _blobServiceClient;
     private readonly string _containerName = "images";
 
-    public ImageService(HttpClient httpClient, BlobServiceClient blobServiceClient)
+    public ImageService(
+        HttpClient httpClient,
+        BlobServiceClient blobServiceClient)
     {
         _httpClient = httpClient;
         _blobServiceClient = blobServiceClient;
     }
 
-    public async Task<ImageProcessingResult> GetAndProcessImageAsync(WeatherStation station, Guid jobId)
+    public async Task<ImageProcessingResult> GetAndProcessImageAsync(
+        WeatherStation station,
+        Guid jobId)
     {
         var apiKey = Environment.GetEnvironmentVariable("UnsplashApiKey");
-        var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.unsplash.com/photos/random?client_id={apiKey}");
+
+        // debug line for azure deployment. REMOVE AFTER IT WORKS
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException(
+                "UnsplashApiKey environment variable is missing.");
+        }
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"https://api.unsplash.com/photos/random?client_id={apiKey}");
 
         var response = await _httpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
         var jsonString = await response.Content.ReadAsStringAsync();
+
         using var jsonDoc = JsonDocument.Parse(jsonString);
-        string imageUrl = jsonDoc.RootElement.GetProperty("urls").GetProperty("regular").GetString();
+
+        string imageUrl = jsonDoc.RootElement
+            .GetProperty("urls")
+            .GetProperty("regular")
+            .GetString()!;
 
         var imageResponse = await _httpClient.GetAsync(imageUrl);
         imageResponse.EnsureSuccessStatusCode();
 
-        using var stream = await imageResponse.Content.ReadAsStreamAsync();
-        using var ms = new MemoryStream();
-        await stream.CopyToAsync(ms);
-        byte[] originalImageBytes = ms.ToArray();
+        byte[] originalImageBytes =
+            await imageResponse.Content.ReadAsByteArrayAsync();
 
-        using var image = Image.Load(originalImageBytes);
+        using var bitmap = SKBitmap.Decode(originalImageBytes);
 
-        // System.I0.Path because 'Path' is an ambiguous reference between 'SixLabors.ImageSharp.Drawing.Path' and 'System.IO.Path'. Ugly but necessary to avoid ambiguity.
-        string fontPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "../../../Fonts/Arial.ttf"));
+        if (bitmap == null)
+            throw new InvalidOperationException("Could not decode downloaded image.");
 
-        FontCollection collection = new();
+        using var canvas = new SKCanvas(bitmap);
 
-        FontFamily family = collection.Add(fontPath);
+        string weatherText =
+            $"Station: {station.StationName}\n" +
+            $"Temp: {station.Temperature}°C\n" +
+            $"Wind: {station.WindSpeed} m/s\n" +
+            $"Condition: {station.WeatherDescription}";
 
-        Font font = family.CreateFont(
-            24,
-            new FontVariation(KnownVariationAxes.Weight, 700),
-            new FontVariation(KnownVariationAxes.Width, 85),
-            new FontVariation(KnownVariationAxes.OpticalSize, 16));
+        using var typeface = SKTypeface.FromFamilyName(
+            "Arial",
+            SKFontStyle.Bold);
 
-        string weatherText = $"Station: {station.StationName}\n" +
-                             $"Temp: {station.Temperature}°C\n" +
-                             $"Wind: {station.WindSpeed} m/s\n" +
-                             $"Condition: {station.WeatherDescription}";
+        using var font = new SKFont(typeface, 24);
 
-        RichTextOptions textOptions = new(font)
+        using var paint = new SKPaint
         {
-            Origin = new PointF(20, image.Height - 150),
-            WrappingLength = image.Width - 40
+            Color = SKColors.White,
+            IsAntialias = true
         };
 
-        image.Mutate(x => x.Paint(canvas =>
+        var backgroundRect = new SKRect(
+            10,
+            bitmap.Height - 160,
+            bitmap.Width - 10,
+            bitmap.Height - 10);
+
+        using var backgroundPaint = new SKPaint
         {
-            canvas.DrawText(textOptions, weatherText, Brushes.Solid(Color.White), pen:null);
-        }));
+            Color = new SKColor(0, 0, 0, 150)
+        };
 
-        using var outputStream = new MemoryStream();
-        await image.SaveAsJpegAsync(outputStream);
-        byte[] processedImage = outputStream.ToArray();
+        canvas.DrawRect(backgroundRect, backgroundPaint);
 
-        var containerClient = _blobServiceClient.GetBlobContainerClient(_containerName);
+        string[] lines = weatherText.Split('\n');
+
+        float y = bitmap.Height - 125;
+
+        foreach (string line in lines)
+        {
+            canvas.DrawText(line, 20, y, font, paint);
+            y += 30;
+        }
+
+        canvas.Flush();
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 90);
+
+        byte[] processedImage = encoded.ToArray();
+
+        var containerClient =
+            _blobServiceClient.GetBlobContainerClient(_containerName);
+
         await containerClient.CreateIfNotExistsAsync();
 
         var blobName = $"{jobId}/{station.StationId}.jpg";
+
         var blobClient = containerClient.GetBlobClient(blobName);
 
         using var uploadStream = new MemoryStream(processedImage);
+
         await blobClient.UploadAsync(uploadStream, overwrite: true);
 
-        Uri finalUri = blobClient.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddDays(1));
+        Uri finalUri = blobClient.GenerateSasUri(
+            BlobSasPermissions.Read,
+            DateTimeOffset.UtcNow.AddDays(1));
 
         return new ImageProcessingResult(processedImage, finalUri);
     }
