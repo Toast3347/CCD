@@ -68,6 +68,9 @@ public class ProcessWeatherJobFunction
                 WeatherStation = station
             };
 
+            _logger.LogInformation("Queuing image job for station: {StationName} (JobId: {JobId})",
+                station.StationName, job.JobId);
+
             await _queueService.SendImageJobAsync(
                 imageJob,
                 cancellationToken);

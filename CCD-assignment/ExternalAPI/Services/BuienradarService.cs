@@ -37,7 +37,7 @@ namespace ExternalAPI.Services
             }
 
             return feed.Actual.StationMeasurements
-                .Take(50) // 50 is in the requirements, however can only be used once an hour due to Unsplash API rate limiting.
+                .Take(50)
                 .Select(station => new WeatherStation
                 {
                     StationId = station.StationId,

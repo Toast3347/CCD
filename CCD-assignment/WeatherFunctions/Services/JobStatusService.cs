@@ -1,6 +1,7 @@
 ﻿using Azure;
 using Azure.Data.Tables;
 using System.Text.Json;
+using WeatherFunctions.Models;
 
 namespace WeatherFunctions.Services;
 
@@ -22,19 +23,20 @@ public sealed class JobStatusService
 
     public async Task CreateJobAsync(
         Guid jobId,
+        int totalcount,
         CancellationToken cancellationToken = default)
     {
-        var entity = new TableEntity(
-            "ImageJobs",
-            jobId.ToString())
+        var entity = new JobStatusRecord
         {
-            ["Status"] = "Queued",
-            ["CreatedAt"] = DateTimeOffset.UtcNow,
-            ["UpdatedAt"] = DateTimeOffset.UtcNow,
-            ["TotalStations"] = 50,
-            ["ProcessedImages"] = 0,
-            ["FailedImages"] = 0,
-            ["ResultUrls"] = "[]" 
+            PartitionKey = "ImageJobs",
+            RowKey = jobId.ToString(),
+            Status = "Queued",
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            TotalStations = totalcount,
+            ProcessedImages = 0,
+            FailedImages = 0,
+            ResultUrls = "[]"
         };
 
         await _tableClient.AddEntityAsync(
@@ -42,50 +44,52 @@ public sealed class JobStatusService
             cancellationToken);
     }
 
-    public async Task<TableEntity?> GetJobAsync(
+    public async Task<JobStatusRecord?> GetJobAsync(
         Guid jobId,
         CancellationToken cancellationToken = default)
     {
         var response =
-            await _tableClient.GetEntityIfExistsAsync<TableEntity>(
+            await _tableClient.GetEntityIfExistsAsync<JobStatusRecord>(
                 "ImageJobs",
                 jobId.ToString(),
                 cancellationToken: cancellationToken);
 
-        return response.HasValue ? response.Value : null;
+        if (response.HasValue)
+        {
+            return response.Value;
+        }
+
+        return null;
     }
 
     public async Task UpdateProgressAsync(
-        Guid jobId,
-        int processedCount,
-        int failedCount,
-        List<string> urls,
+        JobStatusRecord entity,
         CancellationToken cancellationToken = default)
     {
-        var entity = await GetJobAsync(jobId, cancellationToken);
+        int total = entity.TotalStations > 0 ? entity.TotalStations : 50;
 
-        if (entity is null)
+        if (entity.FailedImages > 0)
         {
-            throw new InvalidOperationException(
-                $"Job {jobId} was not found.");
+            entity.Status = "PartiallyFailed";
+        }
+        else if (entity.ProcessedImages >= total)
+        {
+            entity.Status = "Completed";
+        }
+        else if (entity.ProcessedImages > 0)
+        {
+            entity.Status = "In Progress";
+        }
+        else
+        {
+            entity.Status = "Queued";
         }
 
-        entity["ProcessedImages"] = processedCount;
-        entity["FailedImages"] = failedCount;
-        entity["ResultUrls"] = JsonSerializer.Serialize(urls);
-        entity["UpdatedAt"] = DateTimeOffset.UtcNow;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
 
-        if (processedCount == 50)
-        {
-            entity["Status"] = "Completed";
-        }
-        else if (failedCount > 0)
-        {
-            entity["Status"] = "PartiallyFailed";
-        }
-
-        await _tableClient.UpsertEntityAsync(
+        await _tableClient.UpdateEntityAsync(
             entity,
+            entity.ETag,
             TableUpdateMode.Merge,
             cancellationToken);
     }
@@ -103,12 +107,13 @@ public sealed class JobStatusService
                 $"Job {jobId} was not found.");
         }
 
-        entity["Status"] = status;
-        entity["UpdatedAt"] = DateTimeOffset.UtcNow;
+        entity.Status = status;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await _tableClient.UpsertEntityAsync(
+        await _tableClient.UpdateEntityAsync(
             entity,
-            TableUpdateMode.Merge,
+            entity.ETag,
+            TableUpdateMode.Replace,
             cancellationToken);
     }
 }

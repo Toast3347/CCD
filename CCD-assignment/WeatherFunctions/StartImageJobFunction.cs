@@ -38,10 +38,12 @@ public class StartImageJobFunction
 
         try
         {
+            int totalStations = 50;
             await _jobStatusService.InitializeAsync(cancellationToken);
 
             await _jobStatusService.CreateJobAsync(
                 jobId,
+                totalStations,
                 cancellationToken);
 
             var message = new WeatherJobMessageDto

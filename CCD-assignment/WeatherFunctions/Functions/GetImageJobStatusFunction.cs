@@ -59,29 +59,12 @@ public sealed class GetImageJobStatusFunction
             return notFound;
         }
 
-        var status = job.TryGetValue("Status", out var statusValue)
-            ? statusValue?.ToString()
-            : "Unknown";
-
-        var createdAt = job.TryGetValue("CreatedAt", out var createdValue)
-            ? createdValue
-            : null;
-
-        var updatedAt = job.TryGetValue("UpdatedAt", out var updatedValue)
-            ? updatedValue
-            : null;
-
-        var totalStations = job.TryGetValue("TotalStations", out var totalValue)
-            ? totalValue
-            : 0;
-
-        var processedImages = job.TryGetValue("ProcessedImages", out var processedValue)
-            ? processedValue
-            : 0;
-
-        var failedImages = job.TryGetValue("FailedImages", out var failedValue)
-            ? failedValue
-            : 0;
+        var status = job.Status;
+        var createdAt = job.CreatedAt;
+        var updatedAt = job.UpdatedAt;
+        var totalStations = job.TotalStations;
+        var processedImages = job.ProcessedImages;
+        var failedImages = job.FailedImages;
 
         _logger.LogInformation(
             "Retrieved status for job {JobId}: {Status}",
