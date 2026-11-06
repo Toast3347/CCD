@@ -2,7 +2,7 @@
   "profiles": {
     "WeatherFunctions": {
       "commandName": "Project",
-      "commandLineArgs": "--port 7157"
+      "commandLineArgs": "--port 7071"
     },
     "Container (Dockerfile)": {
       "commandName": "Docker",
