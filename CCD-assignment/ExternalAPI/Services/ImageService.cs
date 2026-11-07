@@ -27,7 +27,6 @@ public sealed class ImageService : IImageService
     {
         var apiKey = Environment.GetEnvironmentVariable("UnsplashApiKey");
 
-        // debug line for azure deployment. REMOVE AFTER IT WORKS
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             throw new InvalidOperationException(
