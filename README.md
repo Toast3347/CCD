@@ -56,3 +56,5 @@ Functions:
 
         ProcessWeatherJob: queueTrigger
 ```
+
+HTTP files are under the HttpFiles folder for existing deployment
