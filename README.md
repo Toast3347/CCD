@@ -32,7 +32,7 @@ func start
 ### Step 5:
 Make a request.
 ```bash
-Default request url:  http://localhost:7071/api/images
+Default POST request url:  http://localhost:7071/api/images
 ```
 
 ## Azure deployment
