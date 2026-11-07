@@ -12,15 +12,18 @@ public class ProcessWeatherJobFunction
     private readonly IWeatherService _weatherService;
     private readonly QueueStorageService _queueService;
     private readonly ILogger<ProcessWeatherJobFunction> _logger;
+    private readonly JobStatusService _jobStatusService;
 
     public ProcessWeatherJobFunction(
         IWeatherService weatherService,
         QueueStorageService queueService,
-        ILogger<ProcessWeatherJobFunction> logger)
+        ILogger<ProcessWeatherJobFunction> logger,
+        JobStatusService jobStatusService)
     {
         _weatherService = weatherService;
         _queueService = queueService;
         _logger = logger;
+        _jobStatusService = jobStatusService;
     }
 
     [Function("ProcessWeatherJob")]
@@ -44,14 +47,43 @@ public class ProcessWeatherJobFunction
             "Starting weather job {JobId}",
             job.JobId);
 
+        var record = await _jobStatusService.GetJobAsync(
+            job.JobId,
+            cancellationToken);
+
+        if (record == null)
+        {
+            throw new InvalidOperationException(
+                $"Job {job.JobId} was not found in the job status table.");
+        }
+
         // Fetch weather data
-        var stations = await _weatherService.GetStationsAsync(
+        var stations = await _weatherService.GetStationsAsync( 
+            record.TotalStations,
             cancellationToken);
 
         if (stations.Count == 0)
         {
             throw new InvalidOperationException(
                 "No weather stations were returned by Buienradar.");
+        }
+
+        if (record.TotalStations != stations.Count)
+        {
+            _logger.LogInformation("Mismatch in total stations for job {JobId}: expected {Expected}, got {Actual}",
+                job.JobId,
+                record.TotalStations,
+                stations.Count);
+
+            _logger.LogInformation("Updating total stations for job {JobId} from {OldCount} to {NewCount}",
+                job.JobId,
+                record.TotalStations,
+                stations.Count);
+
+            record.TotalStations = stations.Count;
+            await _jobStatusService.UpdateProgressAsync(
+                record,
+                cancellationToken);
         }
 
         _logger.LogInformation(

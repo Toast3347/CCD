@@ -16,7 +16,7 @@ namespace ExternalAPI.Services
             _httpClient = httpClient;
         }
 
-        public async Task<List<WeatherStation>> GetStationsAsync(CancellationToken cancellationToken = default)
+        public async Task<List<WeatherStation>> GetStationsAsync(int count, CancellationToken cancellationToken = default)
         {
             var response = await _httpClient.GetAsync(
             ApiUrl, cancellationToken);
@@ -37,7 +37,7 @@ namespace ExternalAPI.Services
             }
 
             return feed.Actual.StationMeasurements
-                .Take(50)
+                .Take(count)
                 .Select(station => new WeatherStation
                 {
                     StationId = station.StationId,

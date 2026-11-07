@@ -7,7 +7,7 @@ namespace ExternalAPI.Interfaces
 {
     public interface IWeatherService
     {
-        Task<List<WeatherStation>> GetStationsAsync(
+        Task<List<WeatherStation>> GetStationsAsync( int count,
             CancellationToken cancellationToken = default);
     }
 }
