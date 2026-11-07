@@ -2,7 +2,7 @@
 CCD-assignment for Inholland + Hypersolid
 
 ## Prerequisites
-Docker
+Docker,
 Unsplash dev account and key
 
 ## Local setup
@@ -40,6 +40,7 @@ run deploy script from infrastrucutre folder:
 ```bash
 ./deploy.ps1
 ```
+Note: script will ask for your unsplash api key
 
 ## Endpoints
 ```

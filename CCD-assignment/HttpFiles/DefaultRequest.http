@@ -1,0 +1,2 @@
+POST /api/images HTTP/1.1
+Host: ccdweatherapp-functions.bravesmoke-eaad4bfb.belgiumcentral.azurecontainerapps.io

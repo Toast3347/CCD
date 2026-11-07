@@ -1,0 +1,4 @@
+@imageId = 31139767-bd1c-48dc-af3d-20e23e33fcf1
+GET /api/images/{{imageId}} HTTP/1.1
+Host: ccdweatherapp-functions.bravesmoke-eaad4bfb.belgiumcentral.azurecontainerapps.io
+
