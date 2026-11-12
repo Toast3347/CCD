@@ -199,8 +199,8 @@ resource apiContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
 
       scale: {
-        minReplicas: 1
-        maxReplicas: 5
+        minReplicas: 0
+        maxReplicas: 1
       }
     }
   }
@@ -291,8 +291,8 @@ resource functionsContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
 
       scale: {
-        minReplicas: 1
-        maxReplicas: 10
+        minReplicas: 0
+        maxReplicas: 1
       }
     }
   }
